@@ -62,6 +62,7 @@ public class GeneralsDeploy {
 				ファイルからデッキに入れる();
 
 				//出兵画面に
+				waitForElementPresent("//a[contains(text(), '出兵')]");
 				selenium.click("//a[contains(text(), '出兵')]");
 				waitForElementPresent("id=raid_attack");
 				//強襲にする
@@ -88,8 +89,9 @@ public class GeneralsDeploy {
 				count++;
 				sleep(SLEEP_TIME);
 			}
-		} catch (SeleniumException ee) {
+		} catch (Exception ee) {
 			ee.printStackTrace();
+			selenium.close();
 		}
 		}
 	}
@@ -324,7 +326,7 @@ public class GeneralsDeploy {
 	}
 	public void waitForElementPresent(String element, int waitSecond)  {
 		for (int second = 0;; second++) {
-			if (second >= waitSecond) fail("timeout");
+			if (second >= waitSecond) throw new TimeOutException("timeout element:"+element);
 			try { if (selenium.isElementPresent(element)) break; } catch (Exception e) {}
 			try { 
 				Thread.sleep(1000);
@@ -334,9 +336,14 @@ public class GeneralsDeploy {
 		}
 	}
 
+	class TimeOutException extends RuntimeException {
+		public TimeOutException(String msg) {
+			super(msg);
+		}
+	}
 	public void waitForTextPresent(String pattern, int waitSecond) throws InterruptedException {
 		for (int second = 0;; second++) {
-			if (second >= waitSecond) fail("timeout");
+			if (second >= waitSecond) throw new TimeOutException("timeout element:"+pattern);
 			try { if (selenium.isTextPresent(pattern)) break; } catch (Exception e) {}
 			Thread.sleep(1000);
 		}
