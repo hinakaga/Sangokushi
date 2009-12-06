@@ -20,7 +20,7 @@ public class ResourceAutoLevelUp {
 
 	public static int SLEEP_TIME = 60 * 1000 * 10; //ループを何秒末か
 	public static int BUILD_WAIT_TIME = 60 * 1000 * 50; //建築を待つ
-	public static int START_WAIT_TIME = 60 * 1000 * 60; //一番最初のスリープ
+	public static int START_WAIT_TIME = 60 * 1000 * 0; //一番最初のスリープ
 	
 	public static final boolean DEBUG = false;
 
