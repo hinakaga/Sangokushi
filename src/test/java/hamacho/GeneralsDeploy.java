@@ -23,14 +23,14 @@ import com.thoughtworks.selenium.Selenium;
 import com.thoughtworks.selenium.SeleniumException;
 
 
-public class GeneralsDeploy {
+public class GeneralsDeploy extends SangokushiBase {
 
 	public static int SLEEP_TIME = 60 * 5; //ループを何秒末か
 	public static int START_WAIT_TIME = 60 * 60; //一番最初のスリープ
 	
 	public static final boolean DEBUG = false;
 
-	protected Selenium selenium;
+
 	protected SeleniumServer seleniumServer;
 
 	@Test
@@ -62,7 +62,14 @@ public class GeneralsDeploy {
 				ファイルからデッキに入れる();
 
 				//出兵画面に
-				waitForElementPresent("//a[contains(text(), '出兵')]");
+				sleep(10);
+				//TODO
+				try {
+					waitForElementPresent("//a[contains(text(), '出兵')]");
+				} catch (Exception e) {
+					//なんかここだけエラーになるから、時間があったらデバッグする
+					continue;
+				}
 				selenium.click("//a[contains(text(), '出兵')]");
 				waitForElementPresent("id=raid_attack");
 				//強襲にする
@@ -154,7 +161,7 @@ public class GeneralsDeploy {
 	}
 
 
-	private void デッキを表示させる() {
+	protected void デッキを表示させる() {
 		selenium.click("//a[contains(text(), 'デッキ')]");
 		waitForElementPresent("//a[@href='#deckTop']", 30);
 	}
@@ -242,8 +249,9 @@ public class GeneralsDeploy {
 				new int[] { 500, 0 },
 				new Point[] {
 						new Point(205, -41),
-						new Point(203, -42),
-						new Point(206, -45)
+						new Point(206, -41),
+						new Point(204, -41),
+						new Point(203, -41),
 						}
 				));
 		
@@ -251,106 +259,34 @@ public class GeneralsDeploy {
 	}
 	
 	
+//
+//	private int 指定したデッキの位置の武将の現在のHPを取得(int position) {
+//		
+//		String statusHp = selenium.getText("//div[@id='cardListDeck']/form/div["+(position+1)+"]//span[@class='status_hp']");
+//		return Integer.valueOf(statusHp.split("/")[0]);
+//	}
+//
+//
+//	private int デッキにある武将の枚数取得() {
+//		return getXPathCountBySequencial("//div[@id='cardListDeck']/form/div");
+//	}
+//
+//
+//	private int getXPathCountBySequencial(String path) {
+//		sleep(5);
+//		
+//		int count = 1;
+//		
+//		if(!selenium.isElementPresent(path+"["+count+"]")) {
+//			return 0;
+//		}
+//		count++;
+//		while(selenium.isElementPresent(path+"["+count+"]")) {
+//			count++;
+//		}
+//		return count - 1;
+//	}
+//
 
-	private int 指定したデッキの位置の武将の現在のHPを取得(int position) {
-		
-		String statusHp = selenium.getText("//div[@id='cardListDeck']/form/div["+(position+1)+"]//span[@class='status_hp']");
-		return Integer.valueOf(statusHp.split("/")[0]);
-	}
-
-
-	private int デッキにある武将の枚数取得() {
-		return getXPathCountBySequencial("//div[@id='cardListDeck']/form/div");
-	}
-
-
-	private int getXPathCountBySequencial(String path) {
-		sleep(5);
-		
-		int count = 1;
-		
-		if(!selenium.isElementPresent(path+"["+count+"]")) {
-			return 0;
-		}
-		count++;
-		while(selenium.isElementPresent(path+"["+count+"]")) {
-			count++;
-		}
-		return count - 1;
-	}
-
-
-	private void sleep(int second) {
-		try {
-			Thread.sleep(second * 1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-	}
-
-
-	private void ブラウザ三国志のリンククリックしてワールドが開くまで() throws InterruptedException {
-		waitForElementPresent("//a[contains(text(), 'ブラウザ三国志')]", 30);
-		selenium.click("//a[contains(text(), 'ブラウザ三国志')]");
-		
-		waitForElementPresent("//iframe[contains(@src, 'gadgets')]", 30);
-		
-		String url = selenium.getAttribute("//iframe[contains(@src, 'gadgets')]@src");
-		selenium.open(url);
-		
-		waitForElementPresent("//a[contains(text(), 'mixi 第9ワールド')]", 30);
-		selenium.click("//a[contains(text(), 'mixi 第9ワールド')]");
-		waitForElementPresent("//a[contains(text(), 'デッキ')]", 30);
-	}
-
-
-	private void top開いてログイン() throws IOException {
-		selenium.open("/");
-
-		InputStream is = getClass().getResourceAsStream("login.properties");
-		Properties p = new Properties();
-		p.load(is);
-		is.close();
-
-		selenium.type("name=email", p.getProperty("email"));
-		selenium.type("name=password", p.getProperty("password"));
-		selenium.click("xpath=//p[@class='loginButton']/input");
-		selenium.waitForPageToLoad("5000");
-	}
-	
-
-
-	public void waitForElementPresent(String element) {
-		this.waitForElementPresent(element, 30);
-	}
-	public void waitForElementPresent(String element, int waitSecond)  {
-		for (int second = 0;; second++) {
-			if (second >= waitSecond) throw new TimeOutException("timeout element:"+element);
-			try { if (selenium.isElementPresent(element)) break; } catch (Exception e) {}
-			try { 
-				Thread.sleep(1000);
-			} catch (InterruptedException ex) {
-				throw new RuntimeException();
-			}
-		}
-	}
-
-	class TimeOutException extends RuntimeException {
-		public TimeOutException(String msg) {
-			super(msg);
-		}
-	}
-	public void waitForTextPresent(String pattern, int waitSecond) throws InterruptedException {
-		for (int second = 0;; second++) {
-			if (second >= waitSecond) throw new TimeOutException("timeout element:"+pattern);
-			try { if (selenium.isTextPresent(pattern)) break; } catch (Exception e) {}
-			Thread.sleep(1000);
-		}
-	}
-
-	public void fail(String message) {
-		throw new AssertionFailedError(message);
-	}
 
 }
