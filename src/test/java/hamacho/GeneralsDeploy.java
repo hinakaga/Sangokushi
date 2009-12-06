@@ -67,7 +67,8 @@ public class GeneralsDeploy {
 				//強襲にする
 				//と思ったけど、自分の領地には強襲できないようだ。 selenium.click("id=raid_attack");
 
-				if(is派兵可能()) {
+				int deployCount = 0;
+				while(is派兵可能() && deployCount < 10) {
 					武将を派兵可能にセットする();
 					int atackPower = 派兵可能な武将の攻撃力を取得();
 					for (GeneralsOperationSetting operationSetting : operations) {
@@ -75,6 +76,7 @@ public class GeneralsDeploy {
 							if (!DEBUG) 武将を自陣に派兵する(operationSetting);
 						}
 					}
+					deployCount++;
 				}
 				デッキを表示させる();
 				count++;
