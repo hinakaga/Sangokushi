@@ -20,99 +20,119 @@ import org.openqa.selenium.server.SeleniumServer;
 import com.sun.org.apache.xalan.internal.xsltc.compiler.sym;
 import com.thoughtworks.selenium.DefaultSelenium;
 import com.thoughtworks.selenium.Selenium;
+import com.thoughtworks.selenium.SeleniumException;
 
 
 public class GeneralsDeploy {
 
-	public static int SLEEP_TIME = 60 * 1000 * 10; //ループを何秒末か
-	public static int BUILD_WAIT_TIME = 60 * 1000 * 50; //建築を待つ
-	public static int START_WAIT_TIME = 60 * 1000 * 60; //一番最初のスリープ
+	public static int SLEEP_TIME = 60 * 10; //ループを何秒末か
+	public static int START_WAIT_TIME = 60 * 60; //一番最初のスリープ
 	
 	public static final boolean DEBUG = false;
 
 	protected Selenium selenium;
 	protected SeleniumServer seleniumServer;
 
-	enum Op {
-		Upper, Between;
-	}
-	
-	class GeneralsOperationSetting {
-		Op op;
-		int[] params;
-		Point[] targetPoints;
-		public GeneralsOperationSetting(Op op, int[] params, Point[] targetPoints) {
-			this.op = op;
-			this.params = params;
-			this.targetPoints = targetPoints;
-		}
-		
-		boolean isTarget(int atackPower) {
-			if (op == Op.Upper) {
-				return atackPower > params[0]; 
-			} else if (op == Op.Between) {
-				return params[0] >= atackPower 
-				       &&
-				       params[1] <= atackPower;
-			}
-			return false;
-		}
-	}
-	
-	
-	private List<GeneralsOperationSetting> operations;
-	
-	//TODO 外で設定できるようにしたいね
-	{
-		operations = new ArrayList<GeneralsOperationSetting>();
-		operations.add(new GeneralsOperationSetting(
-				Op.Upper, 
-				new int[] { 500 },
-				new Point[] {
-						new Point(208, -43),
-						new Point(207, -42),
-						new Point(204, -42)
-						}
-				));
-		operations.add(new GeneralsOperationSetting(
-				Op.Between, 
-				new int[] { 500, 0 },
-				new Point[] {
-						new Point(205, -41),
-						new Point(203, -42),
-						new Point(206, -45)
-						}
-				));
-	}
-	
-	
 	@Test
 	public void start() throws Exception {
+		
+		while(true) {	
+			try {
+			selenium = new DefaultSelenium("localhost", 4444, "*safari", "http://mixi.jp/");
 
-//		seleniumServer = new SeleniumServer();
-//		seleniumServer.start();
+			selenium.start();
 
-		selenium = new DefaultSelenium("localhost", 4444, "*safari", "http://mixi.jp/");
+			top開いてログイン();
+			ブラウザ三国志のリンククリックしてワールドが開くまで();
+			デッキを表示させる();
 
-		selenium.start();
+			if (DEBUG) SLEEP_TIME = 10;
+
+			int count = 1;
+			while(true) {
+				//たまに開き直さないと多分だめ
+				if (count % 10 == 0) {
+					selenium.open("/");
+					ブラウザ三国志のリンククリックしてワールドが開くまで();
+				}
+				レベルが上がった武将のステータス強化を行う();
+
+				傷ついた武将をデッキからファイルに戻す();
+				//現状、HPの降順、攻撃力の降順にデッキが見えてる前提でスクリプトを組む
+				ファイルからデッキに入れる();
+
+				//出兵画面に
+				selenium.click("//a[contains(text(), '出兵')]");
+				waitForElementPresent("id=raid_attack");
+				//強襲にする
+				//と思ったけど、自分の領地には強襲できないようだ。 selenium.click("id=raid_attack");
+
+				if(is派兵可能()) {
+					武将を派兵可能にセットする();
+					int atackPower = 派兵可能な武将の攻撃力を取得();
+					for (GeneralsOperationSetting operationSetting : operations) {
+						if (operationSetting.isTarget(atackPower)) {
+							if (!DEBUG) 武将を自陣に派兵する(operationSetting);
+						}
+					}
+				}
+				デッキを表示させる();
+				count++;
+				sleep(SLEEP_TIME);
+			}
+		} catch (SeleniumException ee) {
+			ee.printStackTrace();
+		}
+		}
+	}
+
+
+	private void レベルが上がった武将のステータス強化を行う() {
+		while(selenium.isElementPresent("//img[@class='levelup']")) {
+			selenium.click("//img[@class='levelup']/..");
+			waitForElementPresent("//input[@value='+5']");
+			selenium.click("//input[@value='+5']");
+			
+			sleep(1);
+			selenium.chooseOkOnNextConfirmation();
+			selenium.click("btn_update");
+			
+			waitForElementPresent("//a[@href='#deckTop']", 30);
+		}		
+	}
+
+
+	private void 武将を自陣に派兵する(GeneralsOperationSetting operationSetting) {
+		Point point = operationSetting.getNextTargetPoint();
+		selenium.type("name=village_x_value", String.valueOf(point.x));
+		selenium.type("name=village_y_value", String.valueOf(point.y));
+
+		selenium.click("name=btn_preview");
+
+		waitForElementPresent("name=btn_send");
+		//出兵
+		selenium.click("name=btn_send");
+	}
+
+
+	private void 武将を派兵可能にセットする() {
+		selenium.click("//input[@name='unit_assign_card_id']");
+	}
+
+
+	private int 派兵可能な武将の攻撃力を取得() {
 		
-		top開いてログイン();
-		ブラウザ三国志のリンククリックしてワールドが開くまで();
-		デッキを表示させる();
-		傷ついた武将をデッキからファイルに戻す();
-		//現状、HPの降順、攻撃力の降順にデッキが見えてる前提でスクリプトを組む
-		ファイルからデッキに入れる();
-		
-		//出兵画面に
-		selenium.click("//a[contains(text(), '出兵')]");
-		waitForElementPresent("id=raid_attack", 30);
-		//強襲にする
-		selenium.click("id=raid_attack");
-		System.out.println();
-		
-		
+		String statusText = selenium.getText("//input[@name='unit_assign_card_id']/../../td[3]");
+		statusText = statusText.substring(statusText.indexOf("攻撃") + 2).split(" ")[0];
+		return Integer.valueOf(statusText);
+	}
+
+
+	private boolean is派兵可能() {
+		return selenium.isElementPresent("//input[@name='unit_assign_card_id']");
 		
 	}
+
 
 	private void ファイルからデッキに入れる() {
 		while(selenium.isElementPresent("//img[contains(@src, 'btn_setdeck.gif')]")) {
@@ -153,6 +173,74 @@ public class GeneralsDeploy {
 	}
 	
 
+	enum Op {
+		Upper, Between;
+	}
+	
+	class GeneralsOperationSetting {
+		Op op;
+		int[] params;
+		Point[] targetPoints;
+		public GeneralsOperationSetting(Op op, int[] params, Point[] targetPoints) {
+			this.op = op;
+			this.params = params;
+			this.targetPoints = targetPoints;
+		}
+		
+		boolean isTarget(int atackPower) {
+			if (op == Op.Upper) {
+				return atackPower > params[0]; 
+			} else if (op == Op.Between) {
+				return params[0] >= atackPower 
+				       &&
+				       params[1] <= atackPower;
+			}
+			return false;
+		}
+
+		public Point getNextTargetPoint() {
+			Point returnValue = targetPoints[0];
+			
+			Point[] newTargetPoints = new Point[targetPoints.length];
+			int count = 0;
+			while(count < targetPoints.length - 1) {
+				newTargetPoints[count] = targetPoints[count+1];
+				count++;
+			}
+			newTargetPoints[count] = returnValue;
+			targetPoints = newTargetPoints;
+			return returnValue;
+		}
+	}
+	
+	
+	private List<GeneralsOperationSetting> operations;
+	
+	//TODO 外で設定できるようにしたいね
+	{
+		operations = new ArrayList<GeneralsOperationSetting>();
+		operations.add(new GeneralsOperationSetting(
+				Op.Upper, 
+				new int[] { 500 },
+				new Point[] {
+						new Point(208, -43),
+						new Point(207, -42)
+						}
+				));
+		operations.add(new GeneralsOperationSetting(
+				Op.Between, 
+				new int[] { 500, 0 },
+				new Point[] {
+						new Point(205, -41),
+						new Point(203, -42),
+						new Point(206, -45)
+						}
+				));
+		
+		operations.get(0).getNextTargetPoint();
+	}
+	
+	
 
 	private int 指定したデッキの位置の武将の現在のHPを取得(int position) {
 		
@@ -223,6 +311,9 @@ public class GeneralsDeploy {
 	
 
 
+	public void waitForElementPresent(String element) {
+		this.waitForElementPresent(element, 30);
+	}
 	public void waitForElementPresent(String element, int waitSecond)  {
 		for (int second = 0;; second++) {
 			if (second >= waitSecond) fail("timeout");
@@ -246,76 +337,5 @@ public class GeneralsDeploy {
 	public void fail(String message) {
 		throw new AssertionFailedError(message);
 	}
-
-
-	private int getMostLowLevel(ResourceEnum resourceEnum) {
-
-		int level = minLebelMap.get(resourceEnum);
-		for (int i = level; i < MAX_LEVEL; i++) {
-			for (int second = 0;; second++) {
-				if (second >= 3) break;
-				try {
-					String path = getResourceAreaPath(resourceEnum, i);
-					if (selenium.isElementPresent("//area[@alt='"+resourceEnum.resourceAreaNamePrefix+"LV."+i+"']")) {
-						minLebelMap.put(resourceEnum, i);
-						return i;
-					}
-					Thread.sleep(1000);
-				 } catch (Exception e) {}
-			}
-		}
-		return level;
-	}
-
-	private String getResourceAreaPath(ResourceEnum resourceEnum, int level) {
-		return "//area[@alt='"+resourceEnum.resourceAreaNamePrefix+"LV."+level+"']";
-	}
-
-
-	private void ジャッジメントですの_最低資源生産性(ResourceEnum resourceEnum,
-			MinimunResource minimunResource) {
-		if (minimunResource.resourceEnum == nowBuildResource) {
-			return;
-		}
-		 int resourceProductivity = getProductivity(resourceEnum);
-		 if (resourceProductivity < minimunResource.minValue) {
-			 minimunResource.minValue = resourceProductivity;
-			 minimunResource.resourceEnum = resourceEnum;
-		 }
-	}
-
-	private int getProductivity(ResourceEnum resource) {
-		return Integer.parseInt(selenium.getText("//li[contains(text(), '"+resource.name()+"')]").split(" ")[1]);
-	}
-	
-	public static final int MAX_LEVEL = 10;
-
-	private Map<ResourceEnum, Integer> minLebelMap = new HashMap<ResourceEnum, Integer>();
-	{
-		minLebelMap.put(ResourceEnum.木, 1);
-		minLebelMap.put(ResourceEnum.石, 1);
-		minLebelMap.put(ResourceEnum.鉄, 1);
-		minLebelMap.put(ResourceEnum.糧, 1);
-	}
-
-	private ResourceEnum nowBuildResource;
-	
-	enum ResourceEnum {
-
-		木("伐採所 "), 
-		石("石切り場 "),
-		鉄("製鉄所 "), 糧("畑 ");
-
-		String resourceAreaNamePrefix;
-		ResourceEnum(String resourceAreaNamePrefix){
-			this.resourceAreaNamePrefix = resourceAreaNamePrefix;
-		}
-	}
-
-	class MinimunResource {
-		int minValue;
-		ResourceEnum resourceEnum;
-	}
-
 
 }
