@@ -25,7 +25,7 @@ import com.thoughtworks.selenium.SeleniumException;
 
 public class GeneralsDeploy {
 
-	public static int SLEEP_TIME = 60 * 10; //ループを何秒末か
+	public static int SLEEP_TIME = 60 * 5; //ループを何秒末か
 	public static int START_WAIT_TIME = 60 * 60; //一番最初のスリープ
 	
 	public static final boolean DEBUG = false;
@@ -74,6 +74,7 @@ public class GeneralsDeploy {
 					for (GeneralsOperationSetting operationSetting : operations) {
 						if (operationSetting.isTarget(atackPower)) {
 							if (!DEBUG) 武将を自陣に派兵する(operationSetting);
+							break;
 						}
 					}
 
