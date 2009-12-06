@@ -76,9 +76,14 @@ public class GeneralsDeploy {
 							if (!DEBUG) 武将を自陣に派兵する(operationSetting);
 						}
 					}
+
+					デッキを表示させる();
+					//出兵画面に
+					selenium.click("//a[contains(text(), '出兵')]");
+					waitForElementPresent("id=raid_attack");
+					
 					deployCount++;
 				}
-				デッキを表示させる();
 				count++;
 				sleep(SLEEP_TIME);
 			}
