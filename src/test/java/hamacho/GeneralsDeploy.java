@@ -1,45 +1,36 @@
 package hamacho;
 import java.awt.Point;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import javax.swing.GroupLayout.Alignment;
-
-import junit.framework.AssertionFailedError;
-
-import org.hamcrest.core.IsEqual;
 import org.junit.Test;
 import org.openqa.selenium.server.SeleniumServer;
-
-import com.sun.org.apache.xalan.internal.xsltc.compiler.sym;
-import com.thoughtworks.selenium.DefaultSelenium;
-import com.thoughtworks.selenium.Selenium;
-import com.thoughtworks.selenium.SeleniumException;
 
 
 public class GeneralsDeploy extends SangokushiBase {
 
-	public static int SLEEP_TIME = 60 * 5; //ループを何秒末か
-	public static int START_WAIT_TIME = 60 * 60; //一番最初のスリープ
-	
-	public static final boolean DEBUG = false;
 
+	public static int SLEEP_TIME = 60 * 15; //ループを何秒するか
+	public static int STEP_SLEEP = 20;
+	public static int ERROR_MAX = 20;
+
+	public static final boolean DEBUG = false;
 
 	protected SeleniumServer seleniumServer;
 
+	//今は前提として、デッキのファイルのソート順が、HPの降順が第一位にきてる必要がある。
+	//おすすめは、２番目がLVの降順で、３番目が討伐の降順
+	//というのも設定でどうにかできるといいですが、まだまだですね…
 	@Test
 	public void start() throws Exception {
-		
-		while(true) {	
-			try {
-			selenium = new DefaultSelenium("localhost", 4444, "*safari", "http://mixi.jp/");
 
+		int errorCount = 0;
+
+		while(true) {
+			try {
+			selenium = openSelenium();
 			selenium.start();
 
 			top開いてログイン();
@@ -55,21 +46,19 @@ public class GeneralsDeploy extends SangokushiBase {
 					selenium.open("/");
 					ブラウザ三国志のリンククリックしてワールドが開くまで();
 				}
+				count++;
 				レベルが上がった武将のステータス強化を行う();
 
-				傷ついた武将をデッキからファイルに戻す();
+				if (!DEBUG)傷ついた武将をデッキからファイルに戻す();
 				//現状、HPの降順、攻撃力の降順にデッキが見えてる前提でスクリプトを組む
 				ファイルからデッキに入れる();
 
 				//出兵画面に
-				sleep(10);
+				sleep(20);
 				//TODO
-				try {
-					waitForElementPresent("//a[contains(text(), '出兵')]");
-				} catch (Exception e) {
-					//なんかここだけエラーになるから、時間があったらデバッグする
-					continue;
-				}
+					waitForElementPresent("//a[contains(text(), '出兵')]", 60);
+
+
 				selenium.click("//a[contains(text(), '出兵')]");
 				waitForElementPresent("id=raid_attack");
 				//強襲にする
@@ -78,10 +67,11 @@ public class GeneralsDeploy extends SangokushiBase {
 				int deployCount = 0;
 				while(is派兵可能() && deployCount < 10) {
 					武将を派兵可能にセットする();
-					int atackPower = 派兵可能な武将の攻撃力を取得();
+					GeneralInfo generalInfo = 派兵可能な武将の攻撃力と兵科を取得();
+					int atackPower = generalInfo.atackPower;
 					for (GeneralsOperationSetting operationSetting : operations) {
 						if (operationSetting.isTarget(atackPower)) {
-							if (!DEBUG) 武将を自陣に派兵する(operationSetting);
+							 武将を自陣に派兵する(operationSetting, generalInfo.兵科);
 							break;
 						}
 					}
@@ -90,15 +80,20 @@ public class GeneralsDeploy extends SangokushiBase {
 					//出兵画面に
 					selenium.click("//a[contains(text(), '出兵')]");
 					waitForElementPresent("id=raid_attack");
-					
+
 					deployCount++;
 				}
-				count++;
 				sleep(SLEEP_TIME);
 			}
 		} catch (Exception ee) {
 			ee.printStackTrace();
 			selenium.close();
+			sleep(300);
+
+			errorCount++;
+			if (errorCount > ERROR_MAX) {
+				break;
+			}
 		}
 		}
 	}
@@ -109,26 +104,30 @@ public class GeneralsDeploy extends SangokushiBase {
 			selenium.click("//img[@class='levelup']/..");
 			waitForElementPresent("//input[@value='+5']");
 			selenium.click("//input[@value='+5']");
-			
+
 			sleep(1);
 			selenium.chooseOkOnNextConfirmation();
 			selenium.click("btn_update");
-			
+
 			waitForElementPresent("//a[@href='#deckTop']", 30);
-		}		
+		}
 	}
 
 
-	private void 武将を自陣に派兵する(GeneralsOperationSetting operationSetting) {
-		Point point = operationSetting.getNextTargetPoint();
+	private void 武将を自陣に派兵する(GeneralsOperationSetting operationSetting, 兵科 兵科) {
+		Point point = operationSetting.getNextTargetPoint(兵科);
 		selenium.type("name=village_x_value", String.valueOf(point.x));
 		selenium.type("name=village_y_value", String.valueOf(point.y));
 
 		selenium.click("name=btn_preview");
 
 		waitForElementPresent("name=btn_send");
-		//出兵
-		selenium.click("name=btn_send");
+
+		if (!DEBUG) {
+			//出兵
+			selenium.click("name=btn_send");
+		}
+
 	}
 
 
@@ -137,33 +136,46 @@ public class GeneralsDeploy extends SangokushiBase {
 	}
 
 
-	private int 派兵可能な武将の攻撃力を取得() {
-		
+	class GeneralInfo {
+		int atackPower;
+		兵科 兵科;
+
+	}
+
+	private GeneralInfo 派兵可能な武将の攻撃力と兵科を取得() {
+
 		String statusText = selenium.getText("//input[@name='unit_assign_card_id']/../../td[3]");
+		String 兵科txt = (statusText.substring(statusText.indexOf("兵科：") + 3)).split(" ")[0].replace("\n", "");
 		statusText = statusText.substring(statusText.indexOf("攻撃") + 2).split(" ")[0];
-		return Integer.valueOf(statusText);
+
+		GeneralInfo generalInfo = new GeneralInfo();
+		generalInfo.atackPower = Integer.valueOf(statusText);
+		generalInfo.兵科 = 兵科.valueOf(兵科txt);
+
+		return generalInfo;
 	}
 
 
 	private boolean is派兵可能() {
 		return selenium.isElementPresent("//input[@name='unit_assign_card_id']");
-		
+
 	}
 
 
 	private void ファイルからデッキに入れる() {
+		sleep(STEP_SLEEP);
 		while(selenium.isElementPresent("//img[contains(@src, 'btn_setdeck.gif')]")) {
 			selenium.chooseOkOnNextConfirmation();
 			selenium.click("//img[contains(@src, 'btn_setdeck.gif')]");
 			System.out.println(selenium.getConfirmation());
-			sleep(5);
+			sleep(STEP_SLEEP);
 		}
 	}
 
 
 	protected void デッキを表示させる() {
 		selenium.click("//a[contains(text(), 'デッキ')]");
-		waitForElementPresent("//a[@href='#deckTop']", 30);
+		waitForElementPresent("//a[contains(text(), '出兵')]", 60);
 	}
 
 
@@ -173,7 +185,7 @@ public class GeneralsDeploy extends SangokushiBase {
 			selenium.chooseOkOnNextConfirmation();
 			selenium.click("//img[contains(@src, 'btn_return.gif')]");
 			System.out.println(selenium.getConfirmation());
-			sleep(5);
+			sleep(STEP_SLEEP);
 		}
 		//		int generalsCount = デッキにある武将の枚数取得();
 //		List<Integer> 傷ついた武将の位置List = new ArrayList<Integer>();
@@ -188,36 +200,37 @@ public class GeneralsDeploy extends SangokushiBase {
 //			指定した位置のデッキの武将をファイルに戻す(position);
 //		}
 	}
-	
+
 
 	enum Op {
 		Upper, Between;
 	}
-	
+
 	class GeneralsOperationSetting {
 		Op op;
 		int[] params;
-		Point[] targetPoints;
-		public GeneralsOperationSetting(Op op, int[] params, Point[] targetPoints) {
+		Map<兵科, Point[]> targetPointsMap;
+		public GeneralsOperationSetting(Op op, int[] params, Map<兵科, Point[]> targetPointsMap) {
 			this.op = op;
 			this.params = params;
-			this.targetPoints = targetPoints;
+			this.targetPointsMap = targetPointsMap;
 		}
-		
+
 		boolean isTarget(int atackPower) {
 			if (op == Op.Upper) {
-				return atackPower > params[0]; 
+				return atackPower > params[0];
 			} else if (op == Op.Between) {
-				return params[0] >= atackPower 
+				return params[0] >= atackPower
 				       &&
 				       params[1] <= atackPower;
 			}
 			return false;
 		}
 
-		public Point getNextTargetPoint() {
+		public Point getNextTargetPoint(兵科 兵科) {
+			Point[] targetPoints = targetPointsMap.get(兵科);
 			Point returnValue = targetPoints[0];
-			
+
 			Point[] newTargetPoints = new Point[targetPoints.length];
 			int count = 0;
 			while(count < targetPoints.length - 1) {
@@ -229,39 +242,44 @@ public class GeneralsDeploy extends SangokushiBase {
 			return returnValue;
 		}
 	}
-	
-	
+
+
 	private List<GeneralsOperationSetting> operations;
-	
+
 	//TODO 外で設定できるようにしたいね
 	{
 		operations = new ArrayList<GeneralsOperationSetting>();
+		Map<兵科, Point[]> targetPointsMap = null;
+
+		targetPointsMap = new HashMap<兵科, Point[]>();
+		targetPointsMap.put(兵科.弓兵, new Point[] {point(208, -43) }); //岩
+		targetPointsMap.put(兵科.槍兵, new Point[] {point(207, -42) }); //鉄
+		targetPointsMap.put(兵科.騎兵, new Point[] {point(204, -42) }); //森
+
 		operations.add(new GeneralsOperationSetting(
-				Op.Upper, 
+				Op.Upper,
 				new int[] { 500 },
-				new Point[] {
-						new Point(208, -43),
-						new Point(207, -42)
-						}
-				));
+				targetPointsMap));
+
+		targetPointsMap = new HashMap<兵科, Point[]>();
+		targetPointsMap.put(兵科.弓兵, new Point[] {point(206, -40) }); //岩のはずなんだけど、岩1がない
+		targetPointsMap.put(兵科.槍兵, new Point[] {point(208, -40) }); //鉄
+		targetPointsMap.put(兵科.騎兵, new Point[] {point(209, -43) }); //森
+
 		operations.add(new GeneralsOperationSetting(
-				Op.Between, 
-				new int[] { 500, 0 },
-				new Point[] {
-						new Point(205, -41),
-						new Point(206, -41),
-						new Point(204, -41),
-						new Point(203, -41),
-						}
-				));
-		
-		operations.get(0).getNextTargetPoint();
+				Op.Between,
+				new int[] { 500, 50 },
+				targetPointsMap));
 	}
-	
-	
+
+	private Point point(int x, int y) {
+		return new Point(x, y);
+	}
+
+
 //
 //	private int 指定したデッキの位置の武将の現在のHPを取得(int position) {
-//		
+//
 //		String statusHp = selenium.getText("//div[@id='cardListDeck']/form/div["+(position+1)+"]//span[@class='status_hp']");
 //		return Integer.valueOf(statusHp.split("/")[0]);
 //	}
@@ -274,9 +292,9 @@ public class GeneralsDeploy extends SangokushiBase {
 //
 //	private int getXPathCountBySequencial(String path) {
 //		sleep(5);
-//		
+//
 //		int count = 1;
-//		
+//
 //		if(!selenium.isElementPresent(path+"["+count+"]")) {
 //			return 0;
 //		}
