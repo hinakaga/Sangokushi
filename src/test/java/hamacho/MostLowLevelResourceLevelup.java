@@ -1,43 +1,35 @@
 package hamacho;
-import java.io.InputStream;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
+import org.ho.yaml.Yaml;
 import org.junit.Test;
 import org.openqa.selenium.server.SeleniumServer;
 
-import com.thoughtworks.selenium.DefaultSelenium;
-import com.thoughtworks.selenium.Selenium;
 
 
+public class MostLowLevelResourceLevelup extends SangokushiBase {
 
-public class ResourceAutoLevelUp extends SangokushiBase {
-
-	public static int SLEEP_TIME = 60 * 1000 * 10; //ループを何秒末か
+	public static int SLEEP_TIME = 60 * 1000 * 5; //ループを何秒末か
 	public static int BUILD_WAIT_TIME = 60 * 1000 * 50; //建築を待つ
-	public static int START_WAIT_TIME = 60 * 1000 * 220; //一番最初のスリープ
+	public static int START_WAIT_TIME = 60 * 1000 * 0; //一番最初のスリープ
 
 	public static final boolean DEBUG = false;
 
-	protected Selenium selenium;
 	protected SeleniumServer seleniumServer;
 
 	public static final int MAX_LEVEL = 10;
 
-	Map<ResourceEnum, Integer> minLebelMap = new HashMap<ResourceEnum, Integer>();
-	{
-		minLebelMap.put(ResourceEnum.木, 1);
-		minLebelMap.put(ResourceEnum.石, 1);
-		minLebelMap.put(ResourceEnum.鉄, 1);
-		minLebelMap.put(ResourceEnum.糧, 1);
-	}
-
 	private ResourceEnum nowBuildResource;
+
 
 
 	@Test
 	public void start() throws Exception {
+		Map settings = (Map) Yaml.load(getClass().getResourceAsStream("MostLowLevelResourceLevelup.yaml"));
+		String 拠点名 = (String) settings.get("拠点名");
+		int errorCount = 0;
+		while(true) {
+		try {
 		if (DEBUG) {
 			SLEEP_TIME = 60 * 1000 * 2;
 			BUILD_WAIT_TIME = 60 * 1000 * 3;
@@ -46,25 +38,11 @@ public class ResourceAutoLevelUp extends SangokushiBase {
 
 		Thread.sleep(START_WAIT_TIME);
 
-		selenium = new DefaultSelenium("localhost", 4444, "*safari", "http://mixi.jp/");
+		selenium = openSelenium();
 		selenium.start();
-		selenium.open("/");
 
-		InputStream is = getClass().getResourceAsStream("login.properties");
-		Properties p = new Properties();
-		p.load(is);
-		is.close();
-
-		selenium.type("name=email", p.getProperty("email"));
-		selenium.type("name=password", p.getProperty("password"));
-		selenium.click("xpath=//p[@class='loginButton']/input");
-		selenium.waitForPageToLoad("5000");
-
-		// selenium.open("http://mixi.jp/run_appli.pl?id=6598");
-		waitForElementPresent("//a[contains(text(), 'ブラウザ三国志')]", 30);
-		selenium.click("//a[contains(text(), 'ブラウザ三国志')]");
-		waitForElementPresent("//a[contains(text(), 'mixi 第9ワールド')]", 30);
-		selenium.click("//a[contains(text(), 'mixi 第9ワールド')]");
+		top開いてログイン();
+		ブラウザ三国志のリンククリックしてワールドが開くまで();
 
 		int count = 1;
 
@@ -79,32 +57,30 @@ public class ResourceAutoLevelUp extends SangokushiBase {
 			count++;
 
 			try {
+				拠点を選択して都市を表示させる(拠点名);
 				//伐採所、製鉄所、石切り場 、畑の現在の生産を取得する
 				waitForElementPresent("//img[@alt='木']", 30);
 
-				final MinimunResource minimunResource = new MinimunResource();
-				minimunResource.minValue = Integer.MAX_VALUE;
+				minLebelMap.put(ResourceEnum.鉄 ,getMostLowLevel(ResourceEnum.鉄));
+				minLebelMap.put(ResourceEnum.木 ,getMostLowLevel(ResourceEnum.木));
+				minLebelMap.put(ResourceEnum.石 ,getMostLowLevel(ResourceEnum.石));
+
+				MinimunResource minimunResource = new MinimunResource();
 				minimunResource.resourceEnum = ResourceEnum.木;
-
-//				ジャッジメントですの_最低資源生産性(ResourceEnum.糧, minimunResource);
-				ジャッジメントですの_最低資源生産性(ResourceEnum.木, minimunResource);
-				ジャッジメントですの_最低資源生産性(ResourceEnum.石, minimunResource);
-				ジャッジメントですの_最低資源生産性(ResourceEnum.鉄, minimunResource);
-
-				//最低の生産性の資源に関して、土地のパスを得る
-				final int level = getMostLowLevel(minimunResource.resourceEnum);
-
-				//最低の生産性の最低のレベルの土地をクリック！
-				if (DEBUG) {
-					selenium.click("//area[@alt='宿舎 LV.1']");
-				} else {
-					selenium.click(getResourceAreaPath(minimunResource.resourceEnum, level));
+				minimunResource.minValue = MAX_LEVEL;
+				for (Map.Entry<ResourceEnum, Integer> entry : minLebelMap.entrySet()) {
+					if (entry.getValue() < minimunResource.minValue) {
+						minimunResource.resourceEnum = entry.getKey();
+						minimunResource.minValue = entry.getValue();
+					}
 				}
 
-				try {
-					waitForElementPresent("//div[@class='lvupFacility']/p[@class='main']/a", 10);
+				//最低の生産性の最低のレベルの土地をクリック！
+				selenium.click(getResourceAreaPath(minimunResource.resourceEnum, minimunResource.minValue));
 
-					if (!DEBUG) {
+				try {
+					waitForElementPresent("//div[@class='lvupFacility']/p[@class='main']/a", 30);
+
 
 						selenium.click("//div[@class='lvupFacility']/p[@class='main']/a");
 						//作成しはじめたら、しばらくのあいだその資源のレベルは高いってこととする。
@@ -117,10 +93,10 @@ public class ResourceAutoLevelUp extends SangokushiBase {
 						});
 						buildWaitThread.start();
 
-					} else {
-						waitForElementPresent("//div[@class='back']//a", 10);
-						selenium.click("//div[@class='back']//a");
-					}
+//					} else {
+//						waitForElementPresent("//div[@class='back']//a", 10);
+//						selenium.click("//div[@class='back']//a");
+//					}
 				} catch (Throwable e) {
 
 					selenium.click("//div[@class='back']//a");
@@ -131,7 +107,17 @@ public class ResourceAutoLevelUp extends SangokushiBase {
 				Thread.sleep(SLEEP_TIME); //10分
 			}
 		}
+		} catch (Exception e) {
+			e.printStackTrace();
+			Thread.sleep(SLEEP_TIME);
+			if (errorCount > 10) {
+				return;
+			}
+			errorCount++;
+		}
+		}
 	}
+
 
 
 	private void ジャッジメントですの_最低資源生産性(ResourceEnum resourceEnum,

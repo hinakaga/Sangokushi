@@ -109,7 +109,12 @@
        <artifactId>selenium-java-client-driver</artifactId>
        <version>1.0.1</version>
    </dependency>
-
+        <dependency>
+            <groupId>org.jyaml</groupId>
+            <artifactId>jyaml</artifactId>
+            <version>1.2</version>
+            <scope>compile</scope>
+        </dependency>
   </dependencies>
 
 </project>
