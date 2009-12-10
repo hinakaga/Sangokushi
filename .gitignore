@@ -3,5 +3,5 @@ target
 .project
 .settings
 .DS_Store
-login.properties
+*.yaml
 target
