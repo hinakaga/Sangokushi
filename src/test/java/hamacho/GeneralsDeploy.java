@@ -14,7 +14,7 @@ public class GeneralsDeploy extends SangokushiBase {
 
 
 
-	public static int SLEEP_TIME = 60 * 10; //ループを何秒するか
+	public static int SLEEP_TIME = 60 * 20; //ループを何秒するか
 
 	public static int ERROR_MAX = 30;
 
@@ -42,12 +42,14 @@ public class GeneralsDeploy extends SangokushiBase {
 
 			top開いてログイン();
 			ブラウザ三国志のリンククリックしてワールドが開くまで();
-			デッキを表示させる();
 
 			if (DEBUG) SLEEP_TIME = 10;
 
 			int count = 1;
 			while(true) {
+				デッキを表示させる();
+				try {
+				//	拠点を選択して都市を表示させる("清澄白河山城");
 				//たまに開き直さないと多分だめ
 				if (count % 10 == 0) {
 					selenium.open("/");
@@ -59,6 +61,8 @@ public class GeneralsDeploy extends SangokushiBase {
 				if (!DEBUG)傷ついた武将をデッキからファイルに戻す();
 				//現状、HPの降順、攻撃力の降順にデッキが見えてる前提でスクリプトを組む
 				ファイルからデッキに入れる();
+
+
 
 				//出兵画面に
 				sleep(STEP_SLEEP);
@@ -92,7 +96,11 @@ public class GeneralsDeploy extends SangokushiBase {
 					deployCount++;
 				}
 				sleep(SLEEP_TIME);
+				} catch (TimeOutException te) {
+				te.printStackTrace();
+				}
 			}
+
 		} catch (Exception ee) {
 			ee.printStackTrace();
 			selenium.close();

@@ -16,15 +16,20 @@ abstract public class SangokushiBase {
 
 	protected Selenium selenium;
 
-	public static int STEP_SLEEP = 20;
+	public static int STEP_SLEEP = 5;
 	public int MAX_LEVEL = 20;
 
 	protected Map<ResourceEnum, Integer> minLebelMap = new HashMap<ResourceEnum, Integer>();
 	{
+		initMinLabelMap();
+	//	minLebelMap.put(ResourceEnum.糧, 1);
+	}
+
+	protected void initMinLabelMap() {
 		minLebelMap.put(ResourceEnum.木, 1);
 		minLebelMap.put(ResourceEnum.石, 1);
 		minLebelMap.put(ResourceEnum.鉄, 1);
-	//	minLebelMap.put(ResourceEnum.糧, 1);
+		minLebelMap.put(ResourceEnum.糧, 1);
 	}
 	enum ResourceEnum {
 

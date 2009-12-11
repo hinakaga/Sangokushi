@@ -1,4 +1,5 @@
 package hamacho;
+
 import java.util.Map;
 
 import org.ho.yaml.Yaml;
@@ -9,8 +10,8 @@ import org.openqa.selenium.server.SeleniumServer;
 
 public class MostLowLevelResourceLevelup extends SangokushiBase {
 
-	public static int SLEEP_TIME = 60 * 1000 * 5; //ループを何秒末か
-	public static int BUILD_WAIT_TIME = 60 * 1000 * 50; //建築を待つ
+	public static int SLEEP_TIME = 60 * 1000 * 10; //ループを何秒末か
+	public static int BUILD_WAIT_TIME = 60 * 1000 * 10; //建築を待つ
 	public static int START_WAIT_TIME = 60 * 1000 * 0; //一番最初のスリープ
 
 	public static final boolean DEBUG = false;
@@ -19,10 +20,7 @@ public class MostLowLevelResourceLevelup extends SangokushiBase {
 
 	public static final int MAX_LEVEL = 10;
 
-	private ResourceEnum nowBuildResource;
-
-
-
+	@SuppressWarnings("unchecked")
 	@Test
 	public void start() throws Exception {
 		Map settings = (Map) Yaml.load(getClass().getResourceAsStream("MostLowLevelResourceLevelup.yaml"));
@@ -47,6 +45,7 @@ public class MostLowLevelResourceLevelup extends SangokushiBase {
 		int count = 1;
 
 		while(true) {
+			try {
 			if (count % 10 == 0) { //たまにセッションで変になるので、入り直す
 				selenium.open("/");
 				waitForElementPresent("//a[contains(text(), 'ブラウザ三国志')]", 30);
@@ -56,14 +55,15 @@ public class MostLowLevelResourceLevelup extends SangokushiBase {
 			}
 			count++;
 
-			try {
 				拠点を選択して都市を表示させる(拠点名);
 				//伐採所、製鉄所、石切り場 、畑の現在の生産を取得する
 				waitForElementPresent("//img[@alt='木']", 30);
-
+				initMinLabelMap();
 				minLebelMap.put(ResourceEnum.鉄 ,getMostLowLevel(ResourceEnum.鉄));
 				minLebelMap.put(ResourceEnum.木 ,getMostLowLevel(ResourceEnum.木));
 				minLebelMap.put(ResourceEnum.石 ,getMostLowLevel(ResourceEnum.石));
+				minLebelMap.put(ResourceEnum.糧 ,getMostLowLevel(ResourceEnum.糧));
+
 
 				MinimunResource minimunResource = new MinimunResource();
 				minimunResource.resourceEnum = ResourceEnum.木;
@@ -80,23 +80,7 @@ public class MostLowLevelResourceLevelup extends SangokushiBase {
 
 				try {
 					waitForElementPresent("//div[@class='lvupFacility']/p[@class='main']/a", 30);
-
-
 						selenium.click("//div[@class='lvupFacility']/p[@class='main']/a");
-						//作成しはじめたら、しばらくのあいだその資源のレベルは高いってこととする。
-						nowBuildResource = minimunResource.resourceEnum;
-						Thread buildWaitThread = new Thread(new Runnable() {
-							@Override
-							public void run() {
-								nowBuildResource = null;
-							}
-						});
-						buildWaitThread.start();
-
-//					} else {
-//						waitForElementPresent("//div[@class='back']//a", 10);
-//						selenium.click("//div[@class='back']//a");
-//					}
 				} catch (Throwable e) {
 
 					selenium.click("//div[@class='back']//a");
@@ -104,36 +88,18 @@ public class MostLowLevelResourceLevelup extends SangokushiBase {
 				}
 				Thread.sleep(SLEEP_TIME); //10分
 			} catch (Throwable ee) {
+				ee.printStackTrace();
+				initMinLabelMap();
 				Thread.sleep(SLEEP_TIME); //10分
 			}
 		}
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			e.printStackTrace();
 			Thread.sleep(SLEEP_TIME);
-			if (errorCount > 10) {
-				return;
-			}
+
 			errorCount++;
 		}
 		}
-	}
-
-
-
-	private void ジャッジメントですの_最低資源生産性(ResourceEnum resourceEnum,
-			MinimunResource minimunResource) {
-		if (minimunResource.resourceEnum == nowBuildResource) {
-			return;
-		}
-		 int resourceProductivity = getProductivity(resourceEnum);
-		 if (resourceProductivity < minimunResource.minValue) {
-			 minimunResource.minValue = resourceProductivity;
-			 minimunResource.resourceEnum = resourceEnum;
-		 }
-	}
-
-	private int getProductivity(ResourceEnum resource) {
-		return Integer.parseInt(selenium.getText("//li[contains(text(), '"+resource.name()+"')]").split(" ")[1]);
 	}
 
 }
